@@ -16,6 +16,12 @@ class City
     modify_stat(:literacy, rand(1..3))
     @population += rand(100..1000)
   end
+  
+  def claim_city!(victor)
+	@owner = victor
+	@owner.cities << self
+    self
+  end
 
   def recalculate_manpower
     @manpower = (@population * owner.recruitable_manpower).to_i
@@ -29,7 +35,12 @@ class City
 
   def kill_population(casualties)
     @population -= casualties
-    modify_stat(:literacy, -((@population - casualties) / @population))
+	@population = [@population, 0].min
+	if @population.zero?
+		modify_stat(:literacy, -literacy)
+	else
+		modify_stat(:literacy, -((@population - casualties) / @population))
+	end
   end
 
   def destroyed?
