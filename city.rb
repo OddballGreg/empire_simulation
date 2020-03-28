@@ -17,7 +17,7 @@ class City
     @population += rand(100..1000)
   end
   
-  def claim_city!(victor)
+  def claim!(victor)
   	@owner = victor
   	@owner.cities << self
     self

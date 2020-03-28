@@ -30,11 +30,19 @@ class Nation
     output_stats
   end
 
+  def effective_manpower
+    if recruitable_manpower.positive? && manpower.positive?
+      (manpower / recruitable_manpower).to_i
+    else
+      0
+    end
+  end
+
   def output_stats
     puts "Nation: #{nationality.green}"
     puts "\t - Recruitable Manpower: #{recruitable_manpower.round(2).to_s.green}%"
     puts "\t - Manpower: #{manpower.to_s.green}"
-	  puts "\t - Effective Manpower: #{(manpower / recruitable_manpower).to_i.to_s.green}"
+	  puts "\t - Effective Manpower: #{effective_manpower.to_s.green}"
     puts "\t - Literacy: #{literacy.to_s.green}"
     puts "\t - Population: #{population.to_s.green}"
     puts "\t - War Readiness: #{war_readiness.to_s.green}"
@@ -95,6 +103,7 @@ class Nation
 
   def recalculate_war_readiness
     @war_readiness = [(literacy + unity + ducat_war_readiness + event_war_readiness + rand(0..100) + manpower_war_readiness) / 6, 100].min
+    @war_readiness = 0 if @war_readiness.negative?
   end
 
   def spend_ducats!(ammount)
@@ -136,7 +145,7 @@ class Nation
       else
         recalculate_unity_ratio
     		annexed_city.claim!(self)
-        recalculate_unity
+        recalculate_unity_ratio
         recalculate_war_readiness
         recalculate_population
         puts "The #{nationality.red} now possess the city of #{annexed_city.name}."
