@@ -16,6 +16,12 @@ class City
     modify_stat(:literacy, rand(1..3))
     @population += rand(100..1000)
   end
+  
+  def claim_city!(victor)
+  	@owner = victor
+  	@owner.cities << self
+    self
+  end
 
   def recalculate_manpower
     @manpower = (@population * owner.recruitable_manpower).to_i

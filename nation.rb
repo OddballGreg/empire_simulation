@@ -34,6 +34,7 @@ class Nation
     puts "Nation: #{nationality.green}"
     puts "\t - Recruitable Manpower: #{recruitable_manpower.round(2).to_s.green}%"
     puts "\t - Manpower: #{manpower.to_s.green}"
+	  puts "\t - Effective Manpower: #{(manpower / recruitable_manpower).to_i.to_s.green}"
     puts "\t - Literacy: #{literacy.to_s.green}"
     puts "\t - Population: #{population.to_s.green}"
     puts "\t - War Readiness: #{war_readiness.to_s.green}"
@@ -49,12 +50,12 @@ class Nation
     end
   end
 
-  def lose_city(oppressor)
+  def lose_city
     lost_city = @cities.pop
-    lost_city.owner = oppressor
-    lost_city
+  	lost_city.owner = nil
+  	lost_city
   end
-
+  
   def recalculate_recruitable_manpower
     @recruitable_manpower = recruitable_manpower_base + (events.select(&:nationalism?).size * 0.25) - (events.select(&:disloyal_soldiers?).size * 0.5)
   end
@@ -93,7 +94,7 @@ class Nation
   end
 
   def recalculate_war_readiness
-    @war_readiness = (literacy + unity + ducat_war_readiness + event_war_readiness + rand(0..100) + manpower_war_readiness) / 6
+    @war_readiness = [(literacy + unity + ducat_war_readiness + event_war_readiness + rand(0..100) + manpower_war_readiness) / 6, 100].min
   end
 
   def spend_ducats!(ammount)
@@ -120,9 +121,10 @@ class Nation
   def go_to_war!
     spend_ducats!(rand(1000..10000))
     victim = $nations[$nations.keys.sample]
+	  return if victim == self #Civil war roll?
     puts "The #{nationality.red} go to war with the unfortunate #{victim.nationality.yellow}!"
     if war_readiness > victim.war_readiness
-      annexed_city = victim.lose_city(self)
+      annexed_city = victim.lose_city
       annexed_city.modify_stat(:unity, -(rand(10..50)))
       casualties = rand(100..1000)
       annexed_city.kill_population(casualties)
@@ -132,8 +134,9 @@ class Nation
         earn_ducats!(plunder)
         puts "The evil #{nationality.red} slaughter the inhabitants of #{annexed_city.name}, leaving none living and plundering #{plunder.to_s.blue}."
       else
-        cities << annexed_city
         recalculate_unity_ratio
+    		annexed_city.claim!(self)
+        recalculate_unity
         recalculate_war_readiness
         recalculate_population
         puts "The #{nationality.red} now possess the city of #{annexed_city.name}."
@@ -141,7 +144,7 @@ class Nation
         puts "War Readiness: #{war_readiness.to_s.green}"
       end
 
-      if victim.cities.size < 1
+      unless victim.cities.size.positive?
         puts "The #{victim.nationality} are no more.".red
         if victim.player?
           puts 'It seems your nation has come to an end...'.red.underline
