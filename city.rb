@@ -24,7 +24,7 @@ class City
   end
 
   def recalculate_manpower
-    @manpower = (@population * owner.recruitable_manpower).to_i
+    @manpower = (@population * owner.recruitable_manpower.to_f).to_i
   end
 
   def modify_stat(stat, value)

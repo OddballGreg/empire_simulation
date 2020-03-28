@@ -11,8 +11,8 @@ class Nation
 
     @events = []
 
-    @recruitable_manpower_base = rand(0.10..033)
-    @ducats = rand(0..100_000)
+    @recruitable_manpower_base = rand(0.10..0.33)
+    @ducats = 1000
 
     puts "The #{nationality} form a nation.".blue
 
@@ -66,30 +66,35 @@ class Nation
   
   def recalculate_recruitable_manpower
     @recruitable_manpower = recruitable_manpower_base + (events.select(&:nationalism?).size * 0.25) - (events.select(&:disloyal_soldiers?).size * 0.5)
+    @recruitable_manpower = 0 if @recruitable_manpower.negative?
   end
 
   def recalculate_manpower
     @manpower = @cities.map(&:manpower).sum
+    @manpower = 0 if @manpower.negative?
   end
 
   def recalculate_population
     @population = @cities.map(&:population).sum
+    @population = 0 if @population.negative?
   end
 
   def recalculate_literacy_ratio
     @literacy = (@cities.map(&:literacy).sum / @cities.size)
+    @literacy = 0 if @literacy.negative?
   end
 
   def recalculate_unity_ratio
     @unity = (@cities.map(&:unity).sum / @cities.size)
+    @unity = 0 if @unity.negative?
   end
 
   def war_readiness_ducat_threshold
-    (@ducats.abs / 10000).to_i
+    [(@ducats.abs / 10000).to_i, 0].max
   end
 
   def ducat_war_readiness
-    ((ducats / 1000) * war_readiness_ducat_threshold).to_i
+    [((ducats / 1000) * war_readiness_ducat_threshold).to_i, 0].max
   end
 
   def event_war_readiness
@@ -98,7 +103,7 @@ class Nation
   end
 
   def manpower_war_readiness
-    (manpower / 1000).to_i
+    [(manpower / 1000).to_i, 0].max
   end
 
   def recalculate_war_readiness
@@ -258,7 +263,7 @@ class Nation
 
       case input
       when 'status'
-        puts Self.inspect
+        output_stats
       when 'end turn', 'e', ''
         turn = false
       else
