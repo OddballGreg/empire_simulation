@@ -76,7 +76,6 @@ def simulate
   $nations.sort{|a, b| a[1].cities.count <=> b[1].cities.count }.each do |_nation_id, nation|
     nation.output_stats
   end
-
 end
 
 simulate

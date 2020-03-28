@@ -29,7 +29,12 @@ class City
 
   def kill_population(casualties)
     @population -= casualties
-    modify_stat(:literacy, -((@population - casualties) / @population))
+    if @population.negative?
+      @population = 0 
+      modify_stat(:literacy, -@literacy)
+    else
+      modify_stat(:literacy, -((@population - casualties) / @population))
+    end
   end
 
   def destroyed?

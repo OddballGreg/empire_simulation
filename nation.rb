@@ -5,6 +5,7 @@ class Nation
   def initialize
     @id = newest_id
     @nationality = Faker::Nation.unique.nationality
+    @player = spawn_player?
     $nation_count += 1
     $historical_nation_count += 1
 
@@ -18,10 +19,10 @@ class Nation
     recalculate_recruitable_manpower
 
     @cities = [City.new(self)]
-    rand(0..2).times { @cities << City.new(self) } #city_chance
+    rand(0..2).times { @cities << City.new(self) } #extra city chance
 
-    recalculate_unity
-    recalculate_literacy
+    recalculate_unity_ratio
+    recalculate_literacy_ratio
     recalculate_population
     recalculate_manpower
     recalculate_war_readiness
@@ -66,11 +67,11 @@ class Nation
     @population = @cities.map(&:population).sum
   end
 
-  def recalculate_literacy
+  def recalculate_literacy_ratio
     @literacy = (@cities.map(&:literacy).sum / @cities.size)
   end
 
-  def recalculate_unity
+  def recalculate_unity_ratio
     @unity = (@cities.map(&:unity).sum / @cities.size)
   end
 
@@ -123,15 +124,16 @@ class Nation
     if war_readiness > victim.war_readiness
       annexed_city = victim.lose_city(self)
       annexed_city.modify_stat(:unity, -(rand(10..50)))
-      annexed_city.kill_population(rand(100..1000))
+      casualties = rand(100..1000)
+      annexed_city.kill_population(casualties)
       if annexed_city.destroyed?
-        plunder = victim.ducats / (annexed_city.population / victim.population)
+        plunder = victim.ducats / (casualties.to_f / victim.population)
         victim.spend_ducats!(plunder)
         earn_ducats!(plunder)
         puts "The evil #{nationality.red} slaughter the inhabitants of #{annexed_city.name}, leaving none living and plundering #{plunder.to_s.blue}."
       else
         cities << annexed_city
-        recalculate_unity
+        recalculate_unity_ratio
         recalculate_war_readiness
         recalculate_population
         puts "The #{nationality.red} now possess the city of #{annexed_city.name}."
@@ -141,6 +143,11 @@ class Nation
 
       if victim.cities.size < 1
         puts "The #{victim.nationality} are no more.".red
+        if victim.player?
+          puts 'It seems your nation has come to an end...'.red.underline
+          puts 'Press enter to continue on to the end of history...'.red.blink
+          gets
+        end
         $nations.delete(victim.id)
         $nation_count -= 1
       end
@@ -164,13 +171,21 @@ class Nation
 
   def prosper!
     puts "The #{nationality} prosper!".green
-    recalculate_literacy
+    recalculate_literacy_ratio
     @cities.each(&:prosper!)
-    recalculate_unity
+    recalculate_unity_ratio
     # @ducats += (population * (0.1000 + (literacy * 0.10)))
     @ducats += rand(1000..2000)
     recalculate_war_readiness
     output_stats
+  end
+
+  def spawn_player?
+    $nation_count.zero? && ARGV.any?{|arg| arg == '--player'}
+  end
+
+  def player?
+    @player
   end
 
   def ready_to_go_to_war?
@@ -196,25 +211,49 @@ class Nation
     end
     @events << Event.new('Disloyal Soldiers!', 30)
     spend_manpower!(ducats.abs / 5)
-    recalculate_unity
+    recalculate_unity_ratio
   end
 
   def simulate
-    if ready_to_go_to_war? && outside_truce_period?
-      go_to_war!
-    elsif debt_comes_due?
-      economy_crumbles!
-    elsif good_times?
-      prosper!
-    elsif nationalism?
-      @events << Event.new('Nationalism!', 20)
-    end
+    if @player
+      player_turn
+    else
+      if ready_to_go_to_war? && outside_truce_period?
+        go_to_war!
+      elsif debt_comes_due?
+        economy_crumbles!
+      elsif good_times?
+        prosper!
+      elsif nationalism?
+        @events << Event.new('Nationalism!', 20)
+      end
 
-    @events.map(&:tick!)
-    @events = @events.reject(&:expired?)
+      @events.map(&:tick!)
+      @events = @events.reject(&:expired?)
+    end
   end
 
   private
+
+  def player_turn
+    turn = true
+
+    puts 'What would you like to do?'.blue.blink
+    puts 'status: See Nation Status'
+    puts 'end turn, e: Proceed to next day'
+    while turn
+      input = gets.chomp
+
+      case input
+      when 'status'
+        puts Self.inspect
+      when 'end turn', 'e', ''
+        turn = false
+      else
+        puts 'Unexpected command. Please try again?'
+      end
+    end
+  end
 
   def newest_id
     @@id_count += 1
