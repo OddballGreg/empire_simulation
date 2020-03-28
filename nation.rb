@@ -58,8 +58,12 @@ class Nation
     end
   end
 
-  def lose_city
-    lost_city = @cities.pop
+  def lose_city(lost_city = nil)
+    if lost_city
+      @cities = @cities - [lost_city]
+    else
+      lost_city = @cities.pop
+    end
   	lost_city.owner = nil
   	lost_city
   end
@@ -112,9 +116,18 @@ class Nation
   end
 
   def spend_ducats!(ammount)
-    @ducats -= ammount
-    if @ducats.negative?
-      @events << Event.new("In Debt!", 10)
+    if @ducats - ammount < 0
+      if rand(unity..100) > 75
+        @ducats -= ammount
+
+        @events << Event.new("In Debt!", 10)
+        return true
+      else
+        return false
+      end
+    else
+      @ducats -= ammount
+      return true
     end
   end
 
@@ -133,50 +146,52 @@ class Nation
   end
 
   def go_to_war!
-    spend_ducats!(rand(1000..10000))
     victim = $nations[$nations.keys.sample]
-	  return if victim == self #Civil war roll?
-    puts "The #{nationality.red} go to war with the unfortunate #{victim.nationality.yellow}!"
-    if war_readiness > victim.war_readiness
-      annexed_city = victim.lose_city
-      annexed_city.modify_stat(:unity, -(rand(10..50)))
-      casualties = rand(100..1000)
-      annexed_city.kill_population(casualties)
-      if annexed_city.destroyed?
-        plunder = victim.ducats / (casualties.to_f / victim.population)
-        victim.spend_ducats!(plunder)
-        earn_ducats!(plunder)
-        puts "The evil #{nationality.red} slaughter the inhabitants of #{annexed_city.name}, leaving none living and plundering #{plunder.to_s.blue}."
-      else
-        recalculate_unity_ratio
-    		annexed_city.claim!(self)
-        recalculate_unity_ratio
-        recalculate_war_readiness
-        recalculate_population
-        puts "The #{nationality.red} now possess the city of #{annexed_city.name}."
-        puts "City Count: #{cities.size.to_s.green}"
-        puts "War Readiness: #{war_readiness.to_s.green}"
-      end
-
-      unless victim.cities.size.positive?
-        puts "The #{victim.nationality} are no more.".red
-        if victim.player?
-          puts 'It seems your nation has come to an end...'.red.underline
-          puts 'Press enter to continue on to the end of history...'.red.blink
-          gets
+    return if victim == self #Civil war roll?
+    if spend_ducats!(rand(1000..10000))
+      puts "The #{nationality.red} go to war with the unfortunate #{victim.nationality.yellow}!"
+      if war_readiness > victim.war_readiness
+        annexed_city = victim.lose_city
+        annexed_city.modify_stat(:unity, -(rand(10..50)))
+        casualties = rand(100..1000)
+        annexed_city.kill_population(casualties)
+        if annexed_city.destroyed?
+          plunder = victim.ducats / (casualties.to_f / victim.population)
+          victim.spend_ducats!(plunder)
+          earn_ducats!(plunder)
+          puts "The evil #{nationality.red} slaughter the inhabitants of #{annexed_city.name}, leaving none living and plundering #{plunder.to_s.blue}."
+        else
+      		annexed_city.claim!(self)
+          puts "The #{nationality.red} now possess the city of #{annexed_city.name}."
+          puts "City Count: #{cities.size.to_s.green}"
+          puts "War Readiness: #{war_readiness.to_s.green}"
         end
-        $nations.delete(victim.id)
-        $nation_count -= 1
-      end
 
-      go_to_war!
+        unless victim.cities.size.positive?
+          puts "The #{victim.nationality} are no more.".red
+          if victim.player?
+            puts 'It seems your nation has come to an end...'.red.underline
+            puts 'Press enter to continue on to the end of history...'.red.blink
+            STDIN.gets
+          end
+          $nations.delete(victim.id)
+          $nation_count -= 1
+        end
+
+        go_to_war!
+      else
+        puts "The #{victim.nationality.yellow} succesfully defend themselves against the cruel #{nationality.red}!"
+        # YOOOOOOO This doesn't work anymore. need event
+        war_readiness_loss = rand(5..10)
+        modify_stat(:war_readiness, -war_readiness_loss)
+        puts "#{nationality.red} War Readiness Lost: #{war_readiness_loss.to_s.red}"
+        puts "#{nationality.red} War Readiness: #{war_readiness.to_s.green}"
+      end
     else
-      puts "The #{victim.nationality.yellow} succesfully defend themselves against the cruel #{nationality.red}!"
-      # YOOOOOOO This doesn't work anymore. need event
-      war_readiness_loss = rand(5..10)
-      modify_stat(:war_readiness, -war_readiness_loss)
-      puts "#{nationality.red} War Readiness Lost: #{war_readiness_loss.to_s.red}"
-      puts "#{nationality.red} War Readiness: #{war_readiness.to_s.green}"
+      cities.each do |city|
+        city.modify_stat(:unity, rand(-5..0))
+      end
+      puts "Despite national or politcal desire to go to war, the #{nationality.red} are unable to fund the war effort they desire."
     end
   end
 
@@ -222,16 +237,40 @@ class Nation
   end
 
   def economy_crumbles!
+    destroyed_cities = []
     cities.each do |city|
       city.modify_stat(:unity, -((city.population / population) + rand(0..10)) )
       city.kill_population(ducats.abs)
+      destroyed_cities << city if city.destroyed?
     end
+
+    destroyed_cities.each do |city|
+      lose_city(city)
+    end
+    
+    unless cities.size.positive?
+      puts "The #{nationality} are no more as their economy crumbles from within.".red
+      if player?
+        puts 'It seems your nation has come to an end...'.red.underline
+        puts 'Press enter to continue on to the end of history...'.red.blink
+        STDIN.gets
+      end
+      $nations.delete(id)
+      $nation_count -= 1
+      return
+    end
+
     @events << Event.new('Disloyal Soldiers!', 30)
     spend_manpower!(ducats.abs / 5)
-    recalculate_unity_ratio
   end
 
   def simulate
+    recalculate_unity_ratio
+    recalculate_literacy_ratio
+    recalculate_population
+    recalculate_manpower
+    recalculate_war_readiness
+
     if @player
       player_turn
     else
@@ -259,7 +298,7 @@ class Nation
     puts 'status: See Nation Status'
     puts 'end turn, e: Proceed to next day'
     while turn
-      input = gets.chomp
+      input = STDIN.gets.chomp
 
       case input
       when 'status'

@@ -28,9 +28,26 @@ class City
   end
 
   def modify_stat(stat, value)
-    eval("@#{stat} += #{value}")
-    eval("@#{stat} = 0") if send(stat).negative?
-    eval("@#{stat} = 100") if send(stat) > 100
+    case stat
+    when :unity
+      @unity += value
+      @unity = 0 if send(stat).negative?
+      @unity = 100 if send(stat) > 100
+    when :literacy
+      @literacy += value
+      @literacy = 0 if send(stat).negative?
+      @literacy = 100 if send(stat) > 100
+    when :population
+      @population += value
+      @population = 0 if send(stat).negative?
+      @population = 100 if send(stat) > 100
+    when :manpower
+      @manpower += value
+      @manpower = 0 if send(stat).negative?
+      @manpower = 100 if send(stat) > 100
+    else
+      puts 'Unexpected stat'
+    end
   end
 
   def kill_population(casualties)
